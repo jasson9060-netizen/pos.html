@@ -44,7 +44,6 @@
         }
         input:focus, select:focus { border-color: #38bdf8; }
 
-        /* Botones de Paquetes */
         .btn-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -64,7 +63,7 @@
         }
         .btn-pkg:hover, .btn-pkg.active { background: #38bdf8; color: #0f172a; border-color: #38bdf8; }
 
-        /* Vista Previa del Ticket Térmico (Ajustado a 58mm) */
+        /* Vista Previa del Ticket Térmico de 58mm */
         .ticket-preview {
             background: #fff;
             color: #000;
@@ -91,7 +90,7 @@
             max-height: 110px !important;
         }
 
-        .btn-submit {
+        .btn-submit-usb {
             width: 100%;
             background: #22c55e;
             color: #000;
@@ -101,23 +100,29 @@
             border-radius: 6px;
             font-size: 16px;
             cursor: pointer;
-            margin-top: 10px;
+            margin-top: 15px;
+            transition: 0.2s;
         }
-        .btn-submit:hover { background: #16a34a; color: #fff; }
+        .btn-submit-usb:hover { background: #16a34a; color: #fff; }
 
-        /* Reglas de Impresión Térmica de 58mm */
-        @media print {
-            body * { visibility: hidden; }
-            .ticket-preview, .ticket-preview * { visibility: visible; }
-            .ticket-preview {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 48mm; /* Margen real para papel térmico de 58mm */
-                padding: 0;
-                margin: 0;
-                border: none;
-            }
+        .btn-submit-sys {
+            width: 100%;
+            background: #38bdf8;
+            color: #0f172a;
+            font-weight: bold;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+
+        .status-msg {
+            text-align: center;
+            font-size: 12px;
+            margin-top: 10px;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -191,7 +196,6 @@
 
         <div class="line"></div>
         
-        <!-- CÓDIGO QR DE CONSULTA DE ESTATUS -->
         <div class="text-center">
             <div style="font-size: 8px; margin-bottom: 2px;">Escanea para ver el estatus del pedido:</div>
             <div class="qr-box" id="qrcode"></div>
@@ -204,11 +208,16 @@
         </div>
     </div>
 
-    <button class="btn-submit" onclick="imprimirTicket()">🖨️ IMPRIMIR TICKET (58MM)</button>
+    <!-- Botón de Impresión Directa por USB Web -->
+    <button class="btn-submit-usb" onclick="imprimirDirectoUSB()">🔌 IMPRIMIR DIRECTO POR USB</button>
+    <button class="btn-submit-sys" onclick="window.print()">📄 IMPRIMIR VÍA VISTA PREVIA</button>
+    
+    <div class="status-msg" id="usbStatus"></div>
 </div>
 
 <script>
     let conceptoSeleccionado = "Credencial PVC Básica con QR";
+    let usbDevice = null;
 
     window.onload = function() {
         const hoy = new Date();
@@ -246,7 +255,6 @@
         document.getElementById('tAnticipo').innerText = anticipo.toFixed(2);
         document.getElementById('tSaldo').innerText = saldo.toFixed(2);
 
-        // Generar enlace dinámico para que el papá consulte el estatus
         const folio = document.getElementById('tFolio').innerText;
         const host = window.location.origin + window.location.pathname.replace("pos.html", "");
         const urlEstatus = `${host}estatus.html?folio=${folio}&alumno=${encodeURIComponent(alumno)}&escuela=${encodeURIComponent(escuela)}`;
@@ -267,8 +275,67 @@
         });
     }
 
-    function imprimirTicket() {
-        window.print();
+    // --- FUNCIÓN DE IMPRESIÓN DIRECTA SIN APPS (WebUSB) ---
+    async function imprimirDirectoUSB() {
+        const status = document.getElementById('usbStatus');
+        status.style.color = "#38bdf8";
+        status.innerText = "⏳ Conectando con la impresora USB...";
+
+        try {
+            if (!usbDevice) {
+                // Solicitar acceso al dispositivo USB directamente desde Chrome
+                usbDevice = await navigator.usb.requestDevice({ filters: [] });
+            }
+
+            await usbDevice.open();
+            if (usbDevice.configuration === null) {
+                await usbDevice.selectConfiguration(1);
+            }
+            await usbDevice.claimInterface(0);
+
+            // Construcción del texto térmico ESC/POS
+            const encoder = new TextEncoder();
+            const alumno = document.getElementById('tAlumno').innerText;
+            const escuela = document.getElementById('tEscuela').innerText;
+            const folio = document.getElementById('tFolio').innerText;
+            const total = document.getElementById('tTotal').innerText;
+            const anticipo = document.getElementById('tAnticipo').innerText;
+            const saldo = document.getElementById('tSaldo').innerText;
+
+            let ticketText = 
+                "\x1B\x40" + // Inicializar impresora
+                "\x1B\x61\x01" + "STUDIO VIVENCIA\n" +
+                "SM STUDIO VISUAL\n" +
+                "Chimalhuacan, Edo. Mex.\n" +
+                "--------------------------------\n" +
+                "COMPROBANTE DE VENTA\n" +
+                "--------------------------------\n" +
+                "\x1B\x61\x00" +
+                "Folio: #" + folio + "\n" +
+                "Alumno: " + alumno + "\n" +
+                "Escuela: " + escuela + "\n" +
+                "--------------------------------\n" +
+                "Concepto: " + conceptoSeleccionado + "\n" +
+                "TOTAL:    $" + total + "\n" +
+                "ANTICIPO: $" + anticipo + "\n" +
+                "SALDO:    $" + saldo + "\n" +
+                "--------------------------------\n" +
+                "\x1B\x61\x01" + "Conserve su ticket de compra.\n" +
+                "¡Gracias por su preferencia!\n\n\n\n\x1D\x56\x41"; // Saltos y corte de papel
+
+            const data = encoder.encode(ticketText);
+            
+            // Enviar datos directamente al puerto de salida USB (Endpoint 1 o 2)
+            const endpoint = usbDevice.configuration.interfaces[0].alternate.endpoints.find(e => e.direction === 'out').endpointNumber;
+            await usbDevice.transferOut(endpoint, data);
+
+            status.style.color = "#22c55e";
+            status.innerText = "✅ ¡Ticket impreso correctamente!";
+        } catch (error) {
+            console.error(error);
+            status.style.color = "#ef4444";
+            status.innerText = "⚠️ Si es la primera vez, selecciona la impresora en el mensaje emergente de Chrome.";
+        }
     }
 </script>
 
