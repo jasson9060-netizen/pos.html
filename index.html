@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS Venta de Credenciales - Studio Vivencia</title>
+    <!-- Librería para generar el código QR -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            margin: 0;
+            padding: 15px;
+            display: flex;
+            justify-content: center;
+        }
+        .pos-container {
+            width: 100%;
+            max-width: 480px;
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+            border: 1px solid #334155;
+        }
+        .header-pos { text-align: center; margin-bottom: 15px; }
+        .header-pos h2 { margin: 0; color: #38bdf8; font-size: 18px; }
+        .header-pos p { margin: 3px 0 0; color: #94a3b8; font-size: 12px; }
+
+        label { font-size: 12px; color: #cbd5e1; font-weight: bold; margin-top: 10px; display: block; }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #475569;
+            background-color: #0f172a;
+            color: #fff;
+            margin-top: 4px;
+            font-size: 14px;
+            outline: none;
+        }
+        input:focus, select:focus { border-color: #38bdf8; }
+
+        /* Botones de Paquetes */
+        .btn-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .btn-pkg {
+            background: #334155;
+            color: #f8fafc;
+            border: 1px solid #475569;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            text-align: center;
+        }
+        .btn-pkg:hover, .btn-pkg.active { background: #38bdf8; color: #0f172a; border-color: #38bdf8; }
+
+        /* Vista Previa del Ticket Térmico (Ajustado a 58mm) */
+        .ticket-preview {
+            background: #fff;
+            color: #000;
+            font-family: 'Courier New', Courier, monospace;
+            width: 100%;
+            max-width: 260px;
+            margin: 20px auto;
+            padding: 10px;
+            font-size: 11px;
+            border: 1px dashed #64748b;
+            font-weight: bold;
+        }
+        .text-center { text-align: center; }
+        .line { border-bottom: 1px dashed #000; margin: 5px 0; }
+        .double-line { border-bottom: 2px solid #000; margin: 5px 0; }
+        
+        .qr-box {
+            display: flex;
+            justify-content: center;
+            margin: 8px 0;
+        }
+        .qr-box img, .qr-box canvas {
+            max-width: 110px !important;
+            max-height: 110px !important;
+        }
+
+        .btn-submit {
+            width: 100%;
+            background: #22c55e;
+            color: #000;
+            font-weight: bold;
+            padding: 14px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .btn-submit:hover { background: #16a34a; color: #fff; }
+
+        /* Reglas de Impresión Térmica de 58mm */
+        @media print {
+            body * { visibility: hidden; }
+            .ticket-preview, .ticket-preview * { visibility: visible; }
+            .ticket-preview {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 48mm; /* Margen real para papel térmico de 58mm */
+                padding: 0;
+                margin: 0;
+                border: none;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="pos-container">
+    <div class="header-pos">
+        <h2>🎴 POS - Venta de Credenciales</h2>
+        <p>Studio Vivencia / SM Studio Visual</p>
+    </div>
+
+    <!-- Formulario de Captura -->
+    <label>1. Nombre del Alumno(a):</label>
+    <input type="text" id="inputAlumno" placeholder="Ej: Mateo García López" oninput="actualizarTicket()">
+
+    <label>2. Escuela / Grupo:</label>
+    <input type="text" id="inputEscuela" placeholder="Ej: Nicolás Bravo - 3°A" oninput="actualizarTicket()">
+
+    <label>3. Selecciona el Tipo de Credencial:</label>
+    <div class="btn-grid">
+        <button class="btn-pkg active" onclick="seleccionarConcepto('Credencial PVC Básica con QR', 80, this)">🎴 Credencial Básica ($80)</button>
+        <button class="btn-pkg" onclick="seleccionarConcepto('Paq. Credencial + Cordon + Portacredencial', 120, this)">🏷️ Paq. Completo ($120)</button>
+    </div>
+
+    <div style="display: flex; gap: 10px; margin-top: 5px;">
+        <div style="width: 50%;">
+            <label>Costo Total ($):</label>
+            <input type="number" id="inputTotal" value="80" oninput="actualizarTicket()">
+        </div>
+        <div style="width: 50%;">
+            <label>Anticipo ($):</label>
+            <input type="number" id="inputAnticipo" value="80" oninput="actualizarTicket()">
+        </div>
+    </div>
+
+    <!-- TICKET DE IMPRESIÓN 58MM -->
+    <div class="ticket-preview" id="ticketPrint">
+        <div class="text-center">
+            <img src="logo.png" style="max-width: 100px; height: auto;" onerror="this.style.display='none'"><br>
+            <div style="font-size: 13px; font-weight: 900; margin-top: 3px;">STUDIO VIVENCIA</div>
+            <div style="font-size: 8px;">SM STUDIO VISUAL</div>
+            <div style="font-size: 8px;">Chimalhuacán, Estado de México</div>
+            <div class="double-line"></div>
+            <div style="font-size: 10px;">COMPROBANTE DE VENTA</div>
+        </div>
+
+        <div class="line"></div>
+        <div><strong>Folio:</strong> #<span id="tFolio">0001</span></div>
+        <div><strong>Fecha:</strong> <span id="tFecha">--/--/----</span></div>
+        <div><strong>Alumno:</strong> <span id="tAlumno">---</span></div>
+        <div><strong>Escuela/Grupo:</strong> <span id="tEscuela">---</span></div>
+        <div class="line"></div>
+
+        <div><strong>Concepto:</strong></div>
+        <div id="tConcepto" style="font-size: 10px;">Credencial PVC Básica con QR</div>
+
+        <div class="line"></div>
+        <div style="display: flex; justify-content: space-between;">
+            <span>TOTAL:</span>
+            <span>$<span id="tTotal">80.00</span></span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+            <span>ANTICIPO:</span>
+            <span>$<span id="tAnticipo">80.00</span></span>
+        </div>
+        <div class="double-line"></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 900;">
+            <span>RESTANTE:</span>
+            <span>$<span id="tSaldo">0.00</span></span>
+        </div>
+
+        <div class="line"></div>
+        
+        <!-- CÓDIGO QR DE CONSULTA DE ESTATUS -->
+        <div class="text-center">
+            <div style="font-size: 8px; margin-bottom: 2px;">Escanea para ver el estatus del pedido:</div>
+            <div class="qr-box" id="qrcode"></div>
+        </div>
+
+        <div class="double-line"></div>
+        <div class="text-center" style="font-size: 8px;">
+            Conserva este ticket para la entrega de la credencial.<br>
+            ¡Gracias por tu compra!
+        </div>
+    </div>
+
+    <button class="btn-submit" onclick="imprimirTicket()">🖨️ IMPRIMIR TICKET (58MM)</button>
+</div>
+
+<script>
+    let conceptoSeleccionado = "Credencial PVC Básica con QR";
+
+    window.onload = function() {
+        const hoy = new Date();
+        const fechaTexto = hoy.toLocaleDateString('es-MX') + " " + hoy.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        document.getElementById('tFecha').innerText = fechaTexto;
+
+        const folioRandom = Math.floor(1000 + Math.random() * 9000);
+        document.getElementById('tFolio').innerText = folioRandom;
+
+        actualizarTicket();
+    };
+
+    function seleccionarConcepto(nombre, precio, btn) {
+        conceptoSeleccionado = nombre;
+        document.getElementById('inputTotal').value = precio;
+        document.getElementById('inputAnticipo').value = precio;
+
+        document.querySelectorAll('.btn-pkg').forEach(b => b.classList.remove('active'));
+        if(btn) btn.classList.add('active');
+
+        actualizarTicket();
+    }
+
+    function actualizarTicket() {
+        const alumno = document.getElementById('inputAlumno').value.trim() || "---";
+        const escuela = document.getElementById('inputEscuela').value.trim() || "---";
+        const total = parseFloat(document.getElementById('inputTotal').value) || 0;
+        const anticipo = parseFloat(document.getElementById('inputAnticipo').value) || 0;
+        const saldo = total - anticipo;
+
+        document.getElementById('tAlumno').innerText = alumno.toUpperCase();
+        document.getElementById('tEscuela').innerText = escuela.toUpperCase();
+        document.getElementById('tConcepto').innerText = conceptoSeleccionado;
+        document.getElementById('tTotal').innerText = total.toFixed(2);
+        document.getElementById('tAnticipo').innerText = anticipo.toFixed(2);
+        document.getElementById('tSaldo').innerText = saldo.toFixed(2);
+
+        // Generar enlace dinámico para que el papá consulte el estatus
+        const folio = document.getElementById('tFolio').innerText;
+        const host = window.location.origin + window.location.pathname.replace("pos.html", "");
+        const urlEstatus = `${host}estatus.html?folio=${folio}&alumno=${encodeURIComponent(alumno)}&escuela=${encodeURIComponent(escuela)}`;
+        
+        generarQR(urlEstatus);
+    }
+
+    function generarQR(texto) {
+        const qrContainer = document.getElementById("qrcode");
+        qrContainer.innerHTML = ""; 
+        new QRCode(qrContainer, {
+            text: texto,
+            width: 100,
+            height: 100,
+            colorDark : "#000000",
+            colorLight : "#ffffff",
+            correctLevel : QRCode.CorrectLevel.H
+        });
+    }
+
+    function imprimirTicket() {
+        window.print();
+    }
+</script>
+
+</body>
+</html>
