@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>POS Venta de Credenciales - Studio Vivencia</title>
-    <!-- Librería para generar el código QR en pantalla -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -85,9 +83,9 @@
             justify-content: center;
             margin: 8px 0;
         }
-        .qr-box img, .qr-box canvas {
-            max-width: 110px !important;
-            max-height: 110px !important;
+        .qr-box img {
+            width: 120px;
+            height: 120px;
         }
 
         .btn-submit-usb {
@@ -161,17 +159,21 @@
         <button class="btn-pkg" onclick="seleccionarConcepto('Paq. Credencial + Cordon + Portacredencial', 120, this)">🏷️ Paq. Completo ($120)</button>
     </div>
 
-    <!-- Campo de Cantidad y Valores -->
-    <div style="display: flex; gap: 10px; margin-top: 5px;">
-        <div style="width: 33%;">
+    <!-- Modificación de Precio, Cantidad, Total y Anticipo -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 5px;">
+        <div>
+            <label>Precio Unitario ($):</label>
+            <input type="number" id="inputPrecio" value="80" min="0" oninput="actualizarTicket()">
+        </div>
+        <div>
             <label>Cantidad:</label>
             <input type="number" id="inputCantidad" value="1" min="1" oninput="actualizarTicket()">
         </div>
-        <div style="width: 33%;">
+        <div>
             <label>Total ($):</label>
-            <input type="number" id="inputTotal" value="80" oninput="actualizarTicket()">
+            <input type="number" id="inputTotal" value="80" readonly style="background-color: #1e293b; color: #38bdf8; font-weight: bold;">
         </div>
-        <div style="width: 33%;">
+        <div>
             <label>Anticipo ($):</label>
             <input type="number" id="inputAnticipo" value="80" oninput="actualizarTicket()">
         </div>
@@ -197,6 +199,7 @@
 
         <div><strong>Concepto:</strong></div>
         <div id="tConcepto" style="font-size: 10px;">Credencial PVC Básica con QR</div>
+        <div><strong>Precio C/U:</strong> $<span id="tPrecio">80.00</span></div>
         <div><strong>Cantidad:</strong> <span id="tCantidad">1</span> pza(s)</div>
 
         <div class="line"></div>
@@ -218,7 +221,9 @@
         
         <div class="text-center">
             <div style="font-size: 8px; margin-bottom: 2px;">Escanea para ver el estatus del pedido:</div>
-            <div class="qr-box" id="qrcode"></div>
+            <div class="qr-box">
+                <img id="qrImg" src="" alt="Cargando QR...">
+            </div>
         </div>
 
         <div class="double-line"></div>
@@ -236,7 +241,6 @@
 </div>
 
 <script>
-    let precioUnitario = 80;
     let conceptoSeleccionado = "Credencial PVC Básica con QR";
     let usbDevice = null;
     let urlEstatusActual = "";
@@ -254,9 +258,9 @@
         document.getElementById('tFecha').innerText = fechaTexto;
     }
 
-    function seleccionarConcepto(nombre, precio, btn) {
+    function seleccionarConcepto(nombre, precioDefault, btn) {
         conceptoSeleccionado = nombre;
-        precioUnitario = precio;
+        document.getElementById('inputPrecio').value = precioDefault;
 
         document.querySelectorAll('.btn-pkg').forEach(b => b.classList.remove('active'));
         if(btn) btn.classList.add('active');
@@ -270,17 +274,20 @@
         const alumno = document.getElementById('inputAlumno').value.trim() || "ALUMNO";
         const escuela = document.getElementById('inputEscuela').value.trim() || "ESCUELA";
         const cantidad = parseInt(document.getElementById('inputCantidad').value) || 1;
+        const precioUnitario = parseFloat(document.getElementById('inputPrecio').value) || 0;
 
+        // Cálculo dinámico
         const totalCalculado = precioUnitario * cantidad;
         document.getElementById('inputTotal').value = totalCalculado;
 
-        const total = parseFloat(document.getElementById('inputTotal').value) || 0;
+        const total = totalCalculado;
         const anticipo = parseFloat(document.getElementById('inputAnticipo').value) || 0;
         const saldo = total - anticipo;
 
         document.getElementById('tAlumno').innerText = alumno.toUpperCase();
         document.getElementById('tEscuela').innerText = escuela.toUpperCase();
         document.getElementById('tConcepto').innerText = conceptoSeleccionado;
+        document.getElementById('tPrecio').innerText = precioUnitario.toFixed(2);
         document.getElementById('tCantidad').innerText = cantidad;
         document.getElementById('tTotal').innerText = total.toFixed(2);
         document.getElementById('tAnticipo').innerText = anticipo.toFixed(2);
@@ -288,23 +295,10 @@
 
         const folio = document.getElementById('tFolio').innerText;
         
-        // 🔴 ENLACE REAL CORREGIDO PARA TU USUARIO DE GITHUB:
+        // URL OFICIAL DE GITHUB PAGES
         urlEstatusActual = "https://jasson9060-netizen.github.io/estatus.html?folio=" + folio + "&alumno=" + encodeURIComponent(alumno) + "&escuela=" + encodeURIComponent(escuela);
         
-        generarQR(urlEstatusActual);
-    }
-
-    function generarQR(textoUrl) {
-        const qrContainer = document.getElementById("qrcode");
-        qrContainer.innerHTML = ""; 
-        new QRCode(qrContainer, {
-            text: textoUrl,
-            width: 110,
-            height: 110,
-            colorDark : "#000000",
-            colorLight : "#ffffff",
-            correctLevel : QRCode.CorrectLevel.M
-        });
+        document.getElementById('qrImg').src = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" + encodeURIComponent(urlEstatusActual);
     }
 
     async function imprimirDirectoUSB() {
@@ -330,6 +324,7 @@
             const escuela = document.getElementById('tEscuela').innerText;
             const folio = document.getElementById('tFolio').innerText;
             const fechaHora = document.getElementById('tFecha').innerText;
+            const precio = document.getElementById('tPrecio').innerText;
             const cantidad = document.getElementById('tCantidad').innerText;
             const total = document.getElementById('tTotal').innerText;
             const anticipo = document.getElementById('tAnticipo').innerText;
@@ -350,10 +345,11 @@
                 "Escuela: " + escuela + "\n" +
                 "--------------------------------\n" +
                 "Concepto: " + conceptoSeleccionado + "\n" +
-                "Cantidad: " + cantidad + " pza(s)\n" +
-                "TOTAL:    $" + total + "\n" +
-                "ANTICIPO: $" + anticipo + "\n" +
-                "SALDO:    $" + saldo + "\n" +
+                "Precio C/U: $" + precio + "\n" +
+                "Cantidad:   " + cantidad + " pza(s)\n" +
+                "TOTAL:      $" + total + "\n" +
+                "ANTICIPO:   $" + anticipo + "\n" +
+                "SALDO:      $" + saldo + "\n" +
                 "--------------------------------\n" +
                 "\x1B\x61\x01" + "Escanea para ver el estatus:\n\n";
 
