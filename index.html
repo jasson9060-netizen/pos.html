@@ -125,7 +125,6 @@
             font-weight: bold;
         }
 
-        /* Reglas de Impresión Térmica para Vista Previa del Navegador */
         @media print {
             body * { visibility: hidden; }
             .ticket-preview, .ticket-preview * { visibility: visible; }
@@ -162,7 +161,7 @@
         <button class="btn-pkg" onclick="seleccionarConcepto('Paq. Credencial + Cordon + Portacredencial', 120, this)">🏷️ Paq. Completo ($120)</button>
     </div>
 
-    <!-- Campo de Cantidad -->
+    <!-- Campo de Cantidad y Valores -->
     <div style="display: flex; gap: 10px; margin-top: 5px;">
         <div style="width: 33%;">
             <label>Cantidad:</label>
@@ -229,7 +228,7 @@
         </div>
     </div>
 
-    <!-- Botón de Impresión Directa -->
+    <!-- Botones de Impresión -->
     <button class="btn-submit-usb" onclick="imprimirDirectoUSB()">🔌 IMPRIMIR DIRECTO (58MM)</button>
     <button class="btn-submit-sys" onclick="window.print()">📄 IMPRIMIR VÍA VISTA PREVIA</button>
     
@@ -272,7 +271,6 @@
         const escuela = document.getElementById('inputEscuela').value.trim() || "---";
         const cantidad = parseInt(document.getElementById('inputCantidad').value) || 1;
 
-        // Calcular total en función de la cantidad
         const totalCalculado = precioUnitario * cantidad;
         document.getElementById('inputTotal').value = totalCalculado;
 
@@ -289,8 +287,10 @@
         document.getElementById('tSaldo').innerText = saldo.toFixed(2);
 
         const folio = document.getElementById('tFolio').innerText;
-        const host = // Sustituye 'TU-USUARIO' por tu nombre real de usuario de GitHub
-const host = "https://studiovivencia.github.io/";
+        
+        // URL OFICIAL CORREGIDA DE STUDIO VIVENCIA EN GITHUB PAGES
+        const host = "https://studiovivencia.github.io/"; 
+        
         urlEstatusActual = `${host}estatus.html?folio=${folio}&alumno=${encodeURIComponent(alumno)}&escuela=${encodeURIComponent(escuela)}`;
         
         generarQR(urlEstatusActual);
@@ -309,7 +309,6 @@ const host = "https://studiovivencia.github.io/";
         });
     }
 
-    // --- FUNCIÓN DE IMPRESIÓN DIRECTA CON QR Y FECHA ESC/POS ---
     async function imprimirDirectoUSB() {
         const status = document.getElementById('usbStatus');
         status.style.color = "#38bdf8";
@@ -338,9 +337,8 @@ const host = "https://studiovivencia.github.io/";
             const anticipo = document.getElementById('tAnticipo').innerText;
             const saldo = document.getElementById('tSaldo').innerText;
 
-            // Encabezado + Datos en Texto ESC/POS
             let ticketData = 
-                "\x1B\x40" + // Inicializar
+                "\x1B\x40" + 
                 "\x1B\x61\x01" + "STUDIO VIVENCIA\n" +
                 "SM STUDIO VISUAL\n" +
                 "Chimalhuacan, Edo. Mex.\n" +
@@ -361,27 +359,25 @@ const host = "https://studiovivencia.github.io/";
                 "--------------------------------\n" +
                 "\x1B\x61\x01" + "Escanea para ver el estatus:\n\n";
 
-            // Enviar texto del encabezado
             const endpoint = usbDevice.configuration.interfaces[0].alternate.endpoints.find(e => e.direction === 'out').endpointNumber;
             await usbDevice.transferOut(endpoint, encoder.encode(ticketData));
 
-            // --- COMANDOS NATIVOS ESC/POS PARA IMPRIMIR CÓDIGO QR ---
+            // Comando ESC/POS para la impresión nativa del QR
             const qrBytes = encoder.encode(urlEstatusActual);
             const storeLen = qrBytes.length + 3;
             const pL = storeLen % 256;
             const pH = Math.floor(storeLen / 256);
 
             let qrCommands = new Uint8Array([
-                0x1B, 0x61, 0x01,                   // Centrar alineación
-                0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00, // Modelo QR 2
-                0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x06,       // Tamaño de módulo QR (6px)
-                0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x30,       // Nivel de corrección de error
-                0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x80, 0x50, 0x30, ...qrBytes, // Guardar datos QR
-                0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30        // Imprimir QR almacenado
+                0x1B, 0x61, 0x01,
+                0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00,
+                0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x06,
+                0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x30,
+                0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x80, 0x50, 0x30, ...qrBytes,
+                0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30
             ]);
             await usbDevice.transferOut(endpoint, qrCommands);
 
-            // Pie de página + Saltos + Corte de Papel
             let footerText = 
                 "\n--------------------------------\n" +
                 "Conserve su ticket de compra.\n" +
@@ -393,7 +389,7 @@ const host = "https://studiovivencia.github.io/";
         } catch (error) {
             console.error(error);
             status.style.color = "#ef4444";
-            status.innerText = "⚠️ Error al enviar datos a la impresora.";
+            status.innerText = "⚠️ Ocurrió un detalle al enviar el ticket. Intenta usando Vista Previa.";
         }
     }
 </script>
