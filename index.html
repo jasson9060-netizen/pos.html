@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>POS Venta de Credenciales - Studio Vivencia</title>
+    <!-- Motor QR Nativo en JavaScript Puro (Sin librerías externas ni URLs por defecto) -->
+    <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -83,9 +85,9 @@
             justify-content: center;
             margin: 8px 0;
         }
-        .qr-box img {
-            width: 120px;
-            height: 120px;
+        .qr-box canvas {
+            width: 120px !important;
+            height: 120px !important;
         }
 
         .btn-submit-usb {
@@ -222,7 +224,7 @@
         <div class="text-center">
             <div style="font-size: 8px; margin-bottom: 2px;">Escanea para ver el estatus del pedido:</div>
             <div class="qr-box">
-                <img id="qrImg" src="" alt="Cargando QR...">
+                <canvas id="qrCanvas"></canvas>
             </div>
         </div>
 
@@ -244,11 +246,20 @@
     let conceptoSeleccionado = "Credencial PVC Básica con QR";
     let usbDevice = null;
     let urlEstatusActual = "";
+    let qrGenerator = null;
 
     window.onload = function() {
         actualizarFechaHora();
         const folioRandom = Math.floor(1000 + Math.random() * 9000);
         document.getElementById('tFolio').innerText = folioRandom;
+        
+        // Inicializar motor QR Nativo directo al elemento Canvas
+        qrGenerator = new QRious({
+            element: document.getElementById('qrCanvas'),
+            size: 200,
+            level: 'M'
+        });
+
         actualizarTicket();
     };
 
@@ -276,7 +287,6 @@
         const cantidad = parseInt(document.getElementById('inputCantidad').value) || 1;
         const precioUnitario = parseFloat(document.getElementById('inputPrecio').value) || 0;
 
-        // Cálculo dinámico
         const totalCalculado = precioUnitario * cantidad;
         document.getElementById('inputTotal').value = totalCalculado;
 
@@ -295,10 +305,13 @@
 
         const folio = document.getElementById('tFolio').innerText;
         
-        // URL OFICIAL DE GITHUB PAGES
+        // URL EXACTA Y OFICIAL A TU PÁGINA DE ESTATUS
         urlEstatusActual = "https://jasson9060-netizen.github.io/estatus.html?folio=" + folio + "&alumno=" + encodeURIComponent(alumno) + "&escuela=" + encodeURIComponent(escuela);
         
-        document.getElementById('qrImg').src = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" + encodeURIComponent(urlEstatusActual);
+        // Renderizado inmediato y directo en el Canvas (Sin archivos cacheados)
+        if (qrGenerator) {
+            qrGenerator.value = urlEstatusActual;
+        }
     }
 
     async function imprimirDirectoUSB() {
