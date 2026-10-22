@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>POS Venta de Credenciales - Studio Vivencia</title>
-    <!-- Librería para generar el código QR -->
+    <!-- Librería para generar el código QR en pantalla -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         * { box-sizing: border-box; }
@@ -124,6 +124,21 @@
             margin-top: 10px;
             font-weight: bold;
         }
+
+        /* Reglas de Impresión Térmica para Vista Previa del Navegador */
+        @media print {
+            body * { visibility: hidden; }
+            .ticket-preview, .ticket-preview * { visibility: visible; }
+            .ticket-preview {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 48mm;
+                padding: 0;
+                margin: 0;
+                border: none;
+            }
+        }
     </style>
 </head>
 <body>
@@ -147,12 +162,17 @@
         <button class="btn-pkg" onclick="seleccionarConcepto('Paq. Credencial + Cordon + Portacredencial', 120, this)">🏷️ Paq. Completo ($120)</button>
     </div>
 
+    <!-- Campo de Cantidad -->
     <div style="display: flex; gap: 10px; margin-top: 5px;">
-        <div style="width: 50%;">
-            <label>Costo Total ($):</label>
+        <div style="width: 33%;">
+            <label>Cantidad:</label>
+            <input type="number" id="inputCantidad" value="1" min="1" oninput="actualizarTicket()">
+        </div>
+        <div style="width: 33%;">
+            <label>Total ($):</label>
             <input type="number" id="inputTotal" value="80" oninput="actualizarTicket()">
         </div>
-        <div style="width: 50%;">
+        <div style="width: 33%;">
             <label>Anticipo ($):</label>
             <input type="number" id="inputAnticipo" value="80" oninput="actualizarTicket()">
         </div>
@@ -171,13 +191,14 @@
 
         <div class="line"></div>
         <div><strong>Folio:</strong> #<span id="tFolio">0001</span></div>
-        <div><strong>Fecha:</strong> <span id="tFecha">--/--/----</span></div>
+        <div><strong>Fecha/Hora:</strong> <br><span id="tFecha">--/--/---- --:--</span></div>
         <div><strong>Alumno:</strong> <span id="tAlumno">---</span></div>
         <div><strong>Escuela/Grupo:</strong> <span id="tEscuela">---</span></div>
         <div class="line"></div>
 
         <div><strong>Concepto:</strong></div>
         <div id="tConcepto" style="font-size: 10px;">Credencial PVC Básica con QR</div>
+        <div><strong>Cantidad:</strong> <span id="tCantidad">1</span> pza(s)</div>
 
         <div class="line"></div>
         <div style="display: flex; justify-content: space-between;">
@@ -208,32 +229,35 @@
         </div>
     </div>
 
-    <!-- Botón de Impresión Directa por USB Web -->
-    <button class="btn-submit-usb" onclick="imprimirDirectoUSB()">🔌 IMPRIMIR DIRECTO POR USB</button>
+    <!-- Botón de Impresión Directa -->
+    <button class="btn-submit-usb" onclick="imprimirDirectoUSB()">🔌 IMPRIMIR DIRECTO (58MM)</button>
     <button class="btn-submit-sys" onclick="window.print()">📄 IMPRIMIR VÍA VISTA PREVIA</button>
     
     <div class="status-msg" id="usbStatus"></div>
 </div>
 
 <script>
+    let precioUnitario = 80;
     let conceptoSeleccionado = "Credencial PVC Básica con QR";
     let usbDevice = null;
+    let urlEstatusActual = "";
 
     window.onload = function() {
-        const hoy = new Date();
-        const fechaTexto = hoy.toLocaleDateString('es-MX') + " " + hoy.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-        document.getElementById('tFecha').innerText = fechaTexto;
-
+        actualizarFechaHora();
         const folioRandom = Math.floor(1000 + Math.random() * 9000);
         document.getElementById('tFolio').innerText = folioRandom;
-
         actualizarTicket();
     };
 
+    function actualizarFechaHora() {
+        const hoy = new Date();
+        const fechaTexto = hoy.toLocaleDateString('es-MX') + " " + hoy.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        document.getElementById('tFecha').innerText = fechaTexto;
+    }
+
     function seleccionarConcepto(nombre, precio, btn) {
         conceptoSeleccionado = nombre;
-        document.getElementById('inputTotal').value = precio;
-        document.getElementById('inputAnticipo').value = precio;
+        precioUnitario = precio;
 
         document.querySelectorAll('.btn-pkg').forEach(b => b.classList.remove('active'));
         if(btn) btn.classList.add('active');
@@ -242,8 +266,16 @@
     }
 
     function actualizarTicket() {
+        actualizarFechaHora();
+
         const alumno = document.getElementById('inputAlumno').value.trim() || "---";
         const escuela = document.getElementById('inputEscuela').value.trim() || "---";
+        const cantidad = parseInt(document.getElementById('inputCantidad').value) || 1;
+
+        // Calcular total en función de la cantidad
+        const totalCalculado = precioUnitario * cantidad;
+        document.getElementById('inputTotal').value = totalCalculado;
+
         const total = parseFloat(document.getElementById('inputTotal').value) || 0;
         const anticipo = parseFloat(document.getElementById('inputAnticipo').value) || 0;
         const saldo = total - anticipo;
@@ -251,15 +283,16 @@
         document.getElementById('tAlumno').innerText = alumno.toUpperCase();
         document.getElementById('tEscuela').innerText = escuela.toUpperCase();
         document.getElementById('tConcepto').innerText = conceptoSeleccionado;
+        document.getElementById('tCantidad').innerText = cantidad;
         document.getElementById('tTotal').innerText = total.toFixed(2);
         document.getElementById('tAnticipo').innerText = anticipo.toFixed(2);
         document.getElementById('tSaldo').innerText = saldo.toFixed(2);
 
         const folio = document.getElementById('tFolio').innerText;
         const host = window.location.origin + window.location.pathname.replace("pos.html", "");
-        const urlEstatus = `${host}estatus.html?folio=${folio}&alumno=${encodeURIComponent(alumno)}&escuela=${encodeURIComponent(escuela)}`;
+        urlEstatusActual = `${host}estatus.html?folio=${folio}&alumno=${encodeURIComponent(alumno)}&escuela=${encodeURIComponent(escuela)}`;
         
-        generarQR(urlEstatus);
+        generarQR(urlEstatusActual);
     }
 
     function generarQR(texto) {
@@ -275,15 +308,16 @@
         });
     }
 
-    // --- FUNCIÓN DE IMPRESIÓN DIRECTA SIN APPS (WebUSB) ---
+    // --- FUNCIÓN DE IMPRESIÓN DIRECTA CON QR Y FECHA ESC/POS ---
     async function imprimirDirectoUSB() {
         const status = document.getElementById('usbStatus');
         status.style.color = "#38bdf8";
-        status.innerText = "⏳ Conectando con la impresora USB...";
+        status.innerText = "⏳ Imprimiendo ticket...";
+
+        actualizarFechaHora();
 
         try {
             if (!usbDevice) {
-                // Solicitar acceso al dispositivo USB directamente desde Chrome
                 usbDevice = await navigator.usb.requestDevice({ filters: [] });
             }
 
@@ -293,17 +327,19 @@
             }
             await usbDevice.claimInterface(0);
 
-            // Construcción del texto térmico ESC/POS
             const encoder = new TextEncoder();
             const alumno = document.getElementById('tAlumno').innerText;
             const escuela = document.getElementById('tEscuela').innerText;
             const folio = document.getElementById('tFolio').innerText;
+            const fechaHora = document.getElementById('tFecha').innerText;
+            const cantidad = document.getElementById('tCantidad').innerText;
             const total = document.getElementById('tTotal').innerText;
             const anticipo = document.getElementById('tAnticipo').innerText;
             const saldo = document.getElementById('tSaldo').innerText;
 
-            let ticketText = 
-                "\x1B\x40" + // Inicializar impresora
+            // Encabezado + Datos en Texto ESC/POS
+            let ticketData = 
+                "\x1B\x40" + // Inicializar
                 "\x1B\x61\x01" + "STUDIO VIVENCIA\n" +
                 "SM STUDIO VISUAL\n" +
                 "Chimalhuacan, Edo. Mex.\n" +
@@ -312,29 +348,51 @@
                 "--------------------------------\n" +
                 "\x1B\x61\x00" +
                 "Folio: #" + folio + "\n" +
+                "Fecha: " + fechaHora + "\n" +
                 "Alumno: " + alumno + "\n" +
                 "Escuela: " + escuela + "\n" +
                 "--------------------------------\n" +
                 "Concepto: " + conceptoSeleccionado + "\n" +
+                "Cantidad: " + cantidad + " pza(s)\n" +
                 "TOTAL:    $" + total + "\n" +
                 "ANTICIPO: $" + anticipo + "\n" +
                 "SALDO:    $" + saldo + "\n" +
                 "--------------------------------\n" +
-                "\x1B\x61\x01" + "Conserve su ticket de compra.\n" +
-                "¡Gracias por su preferencia!\n\n\n\n\x1D\x56\x41"; // Saltos y corte de papel
+                "\x1B\x61\x01" + "Escanea para ver el estatus:\n\n";
 
-            const data = encoder.encode(ticketText);
-            
-            // Enviar datos directamente al puerto de salida USB (Endpoint 1 o 2)
+            // Enviar texto del encabezado
             const endpoint = usbDevice.configuration.interfaces[0].alternate.endpoints.find(e => e.direction === 'out').endpointNumber;
-            await usbDevice.transferOut(endpoint, data);
+            await usbDevice.transferOut(endpoint, encoder.encode(ticketData));
+
+            // --- COMANDOS NATIVOS ESC/POS PARA IMPRIMIR CÓDIGO QR ---
+            const qrBytes = encoder.encode(urlEstatusActual);
+            const storeLen = qrBytes.length + 3;
+            const pL = storeLen % 256;
+            const pH = Math.floor(storeLen / 256);
+
+            let qrCommands = new Uint8Array([
+                0x1B, 0x61, 0x01,                   // Centrar alineación
+                0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00, // Modelo QR 2
+                0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x06,       // Tamaño de módulo QR (6px)
+                0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x30,       // Nivel de corrección de error
+                0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x80, 0x50, 0x30, ...qrBytes, // Guardar datos QR
+                0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30        // Imprimir QR almacenado
+            ]);
+            await usbDevice.transferOut(endpoint, qrCommands);
+
+            // Pie de página + Saltos + Corte de Papel
+            let footerText = 
+                "\n--------------------------------\n" +
+                "Conserve su ticket de compra.\n" +
+                "¡Gracias por su preferencia!\n\n\n\n\n\x1D\x56\x41";
+            await usbDevice.transferOut(endpoint, encoder.encode(footerText));
 
             status.style.color = "#22c55e";
-            status.innerText = "✅ ¡Ticket impreso correctamente!";
+            status.innerText = "✅ ¡Ticket impreso con QR y fecha!";
         } catch (error) {
             console.error(error);
             status.style.color = "#ef4444";
-            status.innerText = "⚠️ Si es la primera vez, selecciona la impresora en el mensaje emergente de Chrome.";
+            status.innerText = "⚠️ Error al enviar datos a la impresora.";
         }
     }
 </script>
