@@ -267,8 +267,8 @@
     function actualizarTicket() {
         actualizarFechaHora();
 
-        const alumno = document.getElementById('inputAlumno').value.trim() || "---";
-        const escuela = document.getElementById('inputEscuela').value.trim() || "---";
+        const alumno = document.getElementById('inputAlumno').value.trim() || "ALUMNO";
+        const escuela = document.getElementById('inputEscuela').value.trim() || "ESCUELA";
         const cantidad = parseInt(document.getElementById('inputCantidad').value) || 1;
 
         const totalCalculado = precioUnitario * cantidad;
@@ -288,24 +288,22 @@
 
         const folio = document.getElementById('tFolio').innerText;
         
-        // URL OFICIAL CORREGIDA DE STUDIO VIVENCIA EN GITHUB PAGES
-        const host = "https://studiovivencia.github.io/"; 
-        
-        urlEstatusActual = `${host}estatus.html?folio=${folio}&alumno=${encodeURIComponent(alumno)}&escuela=${encodeURIComponent(escuela)}`;
+        // CONSTRUCCIÓN DIRECTA Y FIJA DE LA URL DE STUDIO VIVENCIA
+        urlEstatusActual = "https://studiovivencia.github.io/estatus.html?folio=" + folio + "&alumno=" + encodeURIComponent(alumno) + "&escuela=" + encodeURIComponent(escuela);
         
         generarQR(urlEstatusActual);
     }
 
-    function generarQR(texto) {
+    function generarQR(textoUrl) {
         const qrContainer = document.getElementById("qrcode");
         qrContainer.innerHTML = ""; 
         new QRCode(qrContainer, {
-            text: texto,
-            width: 100,
-            height: 100,
+            text: textoUrl,
+            width: 110,
+            height: 110,
             colorDark : "#000000",
             colorLight : "#ffffff",
-            correctLevel : QRCode.CorrectLevel.H
+            correctLevel : QRCode.CorrectLevel.M
         });
     }
 
@@ -362,7 +360,7 @@
             const endpoint = usbDevice.configuration.interfaces[0].alternate.endpoints.find(e => e.direction === 'out').endpointNumber;
             await usbDevice.transferOut(endpoint, encoder.encode(ticketData));
 
-            // Comando ESC/POS para la impresión nativa del QR
+            // Comando ESC/POS directo para código QR
             const qrBytes = encoder.encode(urlEstatusActual);
             const storeLen = qrBytes.length + 3;
             const pL = storeLen % 256;
@@ -371,7 +369,7 @@
             let qrCommands = new Uint8Array([
                 0x1B, 0x61, 0x01,
                 0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00,
-                0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x06,
+                0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x05,
                 0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x30,
                 0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x80, 0x50, 0x30, ...qrBytes,
                 0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30
