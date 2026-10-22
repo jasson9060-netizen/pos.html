@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>POS Venta de Credenciales - Studio Vivencia</title>
-    <!-- Motor QR Nativo en JavaScript Puro (Sin librerías externas ni URLs por defecto) -->
+    <!-- Motor QR Nativo en JavaScript Puro -->
     <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
     <style>
         * { box-sizing: border-box; }
@@ -63,7 +63,7 @@
         }
         .btn-pkg:hover, .btn-pkg.active { background: #38bdf8; color: #0f172a; border-color: #38bdf8; }
 
-        /* Vista Previa del Ticket Térmico de 58mm */
+        /* Ticket de 58mm */
         .ticket-preview {
             background: #fff;
             color: #000;
@@ -85,9 +85,10 @@
             justify-content: center;
             margin: 8px 0;
         }
-        .qr-box canvas {
-            width: 120px !important;
-            height: 120px !important;
+        .qr-box img {
+            width: 130px !important;
+            height: 130px !important;
+            image-rendering: pixelated;
         }
 
         .btn-submit-usb {
@@ -224,7 +225,7 @@
         <div class="text-center">
             <div style="font-size: 8px; margin-bottom: 2px;">Escanea para ver el estatus del pedido:</div>
             <div class="qr-box">
-                <canvas id="qrCanvas"></canvas>
+                <img id="qrImgFinal" src="" alt="QR Estatus">
             </div>
         </div>
 
@@ -234,6 +235,9 @@
             ¡Gracias por tu compra!
         </div>
     </div>
+
+    <!-- Canvas oculto para procesar el gráfico rasterizado -->
+    <canvas id="qrCanvas" style="display:none;"></canvas>
 
     <!-- Botones de Impresión -->
     <button class="btn-submit-usb" onclick="imprimirDirectoUSB()">🔌 IMPRIMIR DIRECTO (58MM)</button>
@@ -252,12 +256,11 @@
         actualizarFechaHora();
         const folioRandom = Math.floor(1000 + Math.random() * 9000);
         document.getElementById('tFolio').innerText = folioRandom;
-        
-        // Inicializar motor QR Nativo directo al elemento Canvas
+
         qrGenerator = new QRious({
             element: document.getElementById('qrCanvas'),
             size: 200,
-            level: 'M'
+            level: 'H'
         });
 
         actualizarTicket();
@@ -305,15 +308,16 @@
 
         const folio = document.getElementById('tFolio').innerText;
         
-        // URL EXACTA Y OFICIAL A TU PÁGINA DE ESTATUS
+        // URL OFICIAL A TU REPOSITORIO DE GITHUB
         urlEstatusActual = "https://jasson9060-netizen.github.io/estatus.html?folio=" + folio + "&alumno=" + encodeURIComponent(alumno) + "&escuela=" + encodeURIComponent(escuela);
         
-        // Renderizado inmediato y directo en el Canvas (Sin archivos cacheados)
         if (qrGenerator) {
             qrGenerator.value = urlEstatusActual;
+            document.getElementById('qrImgFinal').src = document.getElementById('qrCanvas').toDataURL('image/png');
         }
     }
 
+    // --- IMPRESIÓN DIRECTA RASTERIZADA (PUNTO POR PUNTO) ---
     async function imprimirDirectoUSB() {
         const status = document.getElementById('usbStatus');
         status.style.color = "#38bdf8";
@@ -369,21 +373,43 @@
             const endpoint = usbDevice.configuration.interfaces[0].alternate.endpoints.find(e => e.direction === 'out').endpointNumber;
             await usbDevice.transferOut(endpoint, encoder.encode(ticketData));
 
-            // Comando ESC/POS directo para código QR
-            const qrBytes = encoder.encode(urlEstatusActual);
-            const storeLen = qrBytes.length + 3;
-            const pL = storeLen % 256;
-            const pH = Math.floor(storeLen / 256);
+            // IMPRESIÓN DEL QR COMO IMAGEN RASTERIZADA MATRICIAL (ESC * m n1 n2)
+            const canvas = document.getElementById('qrCanvas');
+            const ctx = canvas.getContext('2d');
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            
+            // Convertir canvas a mapa de bits ESC/POS
+            let width = canvas.width;
+            let height = canvas.height;
+            let bytesPerLine = Math.ceil(width / 8);
+            let imageBytes = [];
 
-            let qrCommands = new Uint8Array([
-                0x1B, 0x61, 0x01,
-                0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00,
-                0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x05,
-                0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x30,
-                0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x80, 0x50, 0x30, ...qrBytes,
-                0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30
-            ]);
-            await usbDevice.transferOut(endpoint, qrCommands);
+            // Comando GS v 0 (Imprimir imagen ráster)
+            imageBytes.push(0x1D, 0x76, 0x30, 0x00); 
+            imageBytes.push(bytesPerLine % 256, Math.floor(bytesPerLine / 256)); // Ancho
+            imageBytes.push(height % 256, Math.floor(height / 256));             // Alto
+
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < bytesPerLine; x++) {
+                    let byteVal = 0;
+                    for (let bit = 0; bit < 8; bit++) {
+                        let pxX = x * 8 + bit;
+                        if (pxX < width) {
+                            let idx = (y * width + pxX) * 4;
+                            let r = imgData.data[idx];
+                            let g = imgData.data[idx + 1];
+                            let b = imgData.data[idx + 2];
+                            let brightness = (r + g + b) / 3;
+                            if (brightness < 128) { // Píxel negro
+                                byteVal |= (128 >> bit);
+                            }
+                        }
+                    }
+                    imageBytes.push(byteVal);
+                }
+            }
+
+            await usbDevice.transferOut(endpoint, new Uint8Array(imageBytes));
 
             let footerText = 
                 "\n--------------------------------\n" +
@@ -392,11 +418,11 @@
             await usbDevice.transferOut(endpoint, encoder.encode(footerText));
 
             status.style.color = "#22c55e";
-            status.innerText = "✅ ¡Ticket impreso con QR y fecha!";
+            status.innerText = "✅ ¡Ticket impreso con QR real y fecha!";
         } catch (error) {
             console.error(error);
             status.style.color = "#ef4444";
-            status.innerText = "⚠️ Ocurrió un detalle al enviar el ticket. Intenta usando Vista Previa.";
+            status.innerText = "⚠️ Error de conexión USB. Asegúrate de conectar el adaptador OTG.";
         }
     }
 </script>
