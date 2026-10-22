@@ -289,7 +289,8 @@
         document.getElementById('tSaldo').innerText = saldo.toFixed(2);
 
         const folio = document.getElementById('tFolio').innerText;
-        const host = window.location.origin + window.location.pathname.replace("pos.html", "");
+        const host = // Sustituye 'TU-USUARIO' por tu nombre real de usuario de GitHub
+const host = "https://TU-USUARIO.github.io/";
         urlEstatusActual = `${host}estatus.html?folio=${folio}&alumno=${encodeURIComponent(alumno)}&escuela=${encodeURIComponent(escuela)}`;
         
         generarQR(urlEstatusActual);
