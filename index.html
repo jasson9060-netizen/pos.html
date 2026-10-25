@@ -4,6 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>POS Venta de Credenciales - Studio Vivencia</title>
+
+    <!-- Favicon para la pestaña del navegador -->
+    <link rel="icon" type="image/png" href="logo.png">
+    <link rel="apple-touch-icon" href="logo.png">
+
+    <!-- Vista previa para WhatsApp y Redes Sociales -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Studio Vivencia | Punto de Venta">
+    <meta property="og:description" content="Sistema interno de control de ventas, pedidos y cobros de Studio Vivencia.">
+    <meta property="og:image" content="https://pos.studiovivencia.com/logo.png">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="512">
+    <meta property="og:image:height" content="512">
+
     <!-- Motor QR Nativo en JavaScript Puro -->
     <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
     <style>
@@ -309,7 +323,7 @@
         const folio = document.getElementById('tFolio').innerText;
         
         // URL OFICIAL A TU REPOSITORIO DE GITHUB
-        urlEstatusActual = "https://jasson9060-netizen.github.io/estatus.html?folio=" + folio + "&alumno=" + encodeURIComponent(alumno) + "&escuela=" + encodeURIComponent(escuela);
+        urlEstatusActual = "https://estatus.studiovivencia.com/?folio=" + folio + "&alumno=" + encodeURIComponent(alumno) + "&escuela=" + encodeURIComponent(escuela);
         
         if (qrGenerator) {
             qrGenerator.value = urlEstatusActual;
@@ -373,21 +387,19 @@
             const endpoint = usbDevice.configuration.interfaces[0].alternate.endpoints.find(e => e.direction === 'out').endpointNumber;
             await usbDevice.transferOut(endpoint, encoder.encode(ticketData));
 
-            // IMPRESIÓN DEL QR COMO IMAGEN RASTERIZADA MATRICIAL (ESC * m n1 n2)
+            // IMPRESIÓN DEL QR COMO IMAGEN RASTERIZADA MATRICIAL
             const canvas = document.getElementById('qrCanvas');
             const ctx = canvas.getContext('2d');
             const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             
-            // Convertir canvas a mapa de bits ESC/POS
             let width = canvas.width;
             let height = canvas.height;
             let bytesPerLine = Math.ceil(width / 8);
             let imageBytes = [];
 
-            // Comando GS v 0 (Imprimir imagen ráster)
             imageBytes.push(0x1D, 0x76, 0x30, 0x00); 
-            imageBytes.push(bytesPerLine % 256, Math.floor(bytesPerLine / 256)); // Ancho
-            imageBytes.push(height % 256, Math.floor(height / 256));             // Alto
+            imageBytes.push(bytesPerLine % 256, Math.floor(bytesPerLine / 256));
+            imageBytes.push(height % 256, Math.floor(height / 256));
 
             for (let y = 0; y < height; y++) {
                 for (let x = 0; x < bytesPerLine; x++) {
@@ -400,7 +412,7 @@
                             let g = imgData.data[idx + 1];
                             let b = imgData.data[idx + 2];
                             let brightness = (r + g + b) / 3;
-                            if (brightness < 128) { // Píxel negro
+                            if (brightness < 128) {
                                 byteVal |= (128 >> bit);
                             }
                         }
